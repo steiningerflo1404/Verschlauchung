@@ -1,4 +1,4 @@
-# Gülleverschlauchung App v1
+# Gülleverschlauchung App v2
 
 Funktionen:
 - Anlagen: Anlage1 und Anlage2
@@ -20,3 +20,9 @@ Einrichtung:
 6. Vercel redeployen
 
 © by Steininger Flo
+
+
+Änderungen v2:
+- Dropdowns öffnen erst nach Eingabe.
+- Fahrer/Kunde überlagern sich nicht mehr.
+- Kommentartexte in Eingabefeldern entfernt.
