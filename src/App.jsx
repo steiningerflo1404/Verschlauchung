@@ -7,21 +7,41 @@ function Field({label,children}){return <label className="field"><span>{label}</
 function SearchSelect({label,value,onChange,options}){
   const[term,setTerm]=useState(value||"");
   const[open,setOpen]=useState(false);
+
   useEffect(()=>{setTerm(value||"")},[value]);
+
   const matches=useMemo(()=>{
     const q=term.trim().toLowerCase();
     if(q.length<1)return [];
-    return options.filter(name=>name.toLowerCase().includes(q)).slice(0,10);
+    return options.filter(name=>name.toLowerCase().includes(q)).slice(0,8);
   },[term,options]);
-  function closeSoon(){window.setTimeout(()=>setOpen(false),160)}
-  return <div className="field search-field">
-    <span>{label}</span>
-    <input value={term} autoComplete="off" onFocus={()=>setOpen(true)} onBlur={closeSoon} onChange={e=>{setTerm(e.target.value);onChange(e.target.value);setOpen(true)}}/>
-    {open&&matches.length>0&&<div className="suggestions">
-      {matches.map(name=><button type="button" key={name} onMouseDown={e=>e.preventDefault()} onClick={()=>{onChange(name);setTerm(name);setOpen(false)}}>{name}</button>)}
+
+  function choose(name){
+    onChange(name);
+    setTerm(name);
+    setOpen(false);
+  }
+
+  return <div className="search-box">
+    <label>{label}</label>
+    <input
+      value={term}
+      autoComplete="off"
+      onFocus={()=>setOpen(true)}
+      onChange={e=>{
+        setTerm(e.target.value);
+        onChange(e.target.value);
+        setOpen(true);
+      }}
+    />
+    {open&&term.trim().length>0&&<div className="suggestions-panel">
+      {matches.length>0?matches.map(name=>
+        <button type="button" key={name} onClick={()=>choose(name)}>{name}</button>
+      ):<div className="no-result">Kein Treffer</div>}
     </div>}
   </div>
 }
+
 export default function App(){const today=new Date().toISOString().slice(0,10);const[form,setForm]=useState({datum:today,anlage:"Anlage1",kunde:"",fahrer:"",kubikmeter:"",fahrerStunden:"",bemerkung:""});const[drivers,setDrivers]=useState([]),[customers,setCustomers]=useState([]),[newDriver,setNewDriver]=useState(""),[newCustomer,setNewCustomer]=useState(""),[showSettings,setShowSettings]=useState(false),[message,setMessage]=useState(""),[loading,setLoading]=useState(false),[sending,setSending]=useState(false),[stopwatchSeconds,setStopwatchSeconds]=useState(0),[stopwatchRunning,setStopwatchRunning]=useState(false);useEffect(()=>{loadLists()},[]);useEffect(()=>{if(!stopwatchRunning)return;const timer=setInterval(()=>setStopwatchSeconds(c=>c+1),1000);return()=>clearInterval(timer)},[stopwatchRunning]);const m3=parseDecimal(form.kubikmeter),driverHours=parseDecimal(form.fahrerStunden);const hasValidM3=!Number.isNaN(m3)&&m3>0,hasValidDriverHours=Number.isNaN(driverHours)?true:driverHours>=0;const canSave=form.datum&&form.anlage&&form.kunde.trim()&&form.fahrer.trim()&&hasValidM3&&hasValidDriverHours&&!sending;
 async function apiGet(action){const r=await fetch(`${SHEET_WEBAPP_URL}?action=${action}&ts=${Date.now()}`);return await r.json()}async function apiPost(payload){await fetch(SHEET_WEBAPP_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)})}
 async function loadLists(){setMessage("");if(!SHEET_WEBAPP_URL){setMessage("Google-Script-Link fehlt noch. Bitte VITE_GOOGLE_SCRIPT_URL in Vercel eintragen.");return}setLoading(true);try{const d=await apiGet("lists");setDrivers(Array.isArray(d.drivers)?d.drivers:[]);setCustomers(Array.isArray(d.customers)?d.customers:[])}catch{setMessage("Listen konnten nicht geladen werden. Bitte Google Script prüfen.")}finally{setLoading(false)}}
@@ -29,4 +49,12 @@ async function addListItem(type){const value=(type==="driver"?newDriver:newCusto
 async function deleteListItem(type,value){if(!confirm(`Wirklich löschen/deaktivieren?\n\n${value}`))return;setLoading(true);try{await apiPost({action:"deleteListItem",type,value});if(type==="driver")setDrivers(drivers.filter(x=>x!==value));else setCustomers(customers.filter(x=>x!==value));setMessage("Eintrag wurde gelöscht.")}catch{setMessage("Eintrag konnte nicht gelöscht werden.")}finally{setLoading(false)}}
 function useStopwatchAsWorkTime(){const h=Math.round((stopwatchSeconds/3600)*100)/100;setForm(c=>({...c,fahrerStunden:String(h).replace(".",",")}))}function resetStopwatch(){setStopwatchRunning(false);setStopwatchSeconds(0)}
 async function saveEntry(e){e.preventDefault();if(!canSave){alert("Bitte Datum, Anlage, Kunde, Fahrer und m³ richtig ausfüllen. m³ darf nicht 0 sein.");return}setSending(true);setMessage("");const payload={action:"entry",datum:form.datum,anlage:form.anlage,kunde:form.kunde.trim(),fahrer:form.fahrer.trim(),kubikmeter:m3,fahrerStunden:Number.isNaN(driverHours)?0:driverHours,bemerkung:form.bemerkung.trim(),erfasstAm:new Date().toISOString()};try{await apiPost(payload);setMessage("Eintrag wurde gespeichert.");setForm({datum:today,anlage:form.anlage,kunde:"",fahrer:"",kubikmeter:"",fahrerStunden:"",bemerkung:""});resetStopwatch()}catch{setMessage("Speichern fehlgeschlagen.")}finally{setSending(false)}}
-return <div className="page"><main className="app-card"><header className="top"><div className="logo">m³</div><div className="header-text"><h1>{APP_NAME}</h1><p>m³-Erfassung für Anlage1 und Anlage2</p></div><button type="button" className="settings-button" onClick={()=>setShowSettings(!showSettings)}>⚙️</button></header>{showSettings&&<section className="section settings-panel"><h2>Einstellungen</h2><div className="settings-grid"><div><h3>Fahrer</h3><div className="add-row"><input value={newDriver} onChange={e=>setNewDriver(e.target.value)}/><button type="button" className="secondary" onClick={()=>addListItem("driver")} disabled={loading}>Hinzufügen</button></div><div className="list-box">{drivers.map(name=><div className="list-item" key={name}><span>{name}</span><button type="button" onClick={()=>deleteListItem("driver",name)}>Löschen</button></div>)}</div></div><div><h3>Kunden</h3><div className="add-row"><input value={newCustomer} onChange={e=>setNewCustomer(e.target.value)}/><button type="button" className="secondary" onClick={()=>addListItem("customer")} disabled={loading}>Hinzufügen</button></div><div className="list-box">{customers.map(name=><div className="list-item" key={name}><span>{name}</span><button type="button" onClick={()=>deleteListItem("customer",name)}>Löschen</button></div>)}</div></div></div></section>}{message&&<div className="message">{message}</div>}<form className="form" onSubmit={saveEntry}><section className="section"><h2>Einsatz</h2><Field label="Datum"><input type="date" value={form.datum} onChange={e=>setForm({...form,datum:e.target.value})}/></Field><Field label="Anlage"><select value={form.anlage} onChange={e=>setForm({...form,anlage:e.target.value})}>{ANLAGEN.map(anlage=><option key={anlage} value={anlage}>{anlage}</option>)}</select></Field></section><section className="section"><h2>Kunde & Fahrer</h2><SearchSelect label="Kunde" value={form.kunde} options={customers} onChange={value=>setForm({...form,kunde:value})}/><SearchSelect label="Fahrer" value={form.fahrer} options={drivers} onChange={value=>setForm({...form,fahrer:value})}/></section><section className="section"><h2>Menge</h2><Field label="Gepumpte Menge in m³"><input type="text" inputMode="decimal" value={form.kubikmeter} onChange={e=>setForm({...form,kubikmeter:e.target.value})}/></Field><div className={!hasValidM3&&form.kubikmeter?"result error":"result"}><span>Menge</span><strong>{hasValidM3?formatNumber(m3)+" m³":"—"}</strong></div></section><section className="section"><h2>Fahrerzeit</h2><div className="stopwatch"><strong>{secondsToClock(stopwatchSeconds)}</strong><div className="stopwatch-buttons"><button type="button" className="secondary" onClick={()=>setStopwatchRunning(true)} disabled={stopwatchRunning}>Start</button><button type="button" className="small-button" onClick={()=>setStopwatchRunning(false)} disabled={!stopwatchRunning}>Pause</button><button type="button" className="small-button" onClick={resetStopwatch}>Reset</button></div><button type="button" className="small-button" onClick={useStopwatchAsWorkTime}>Zeit übernehmen</button></div><Field label="Gefahrene / gearbeitete Stunden Fahrer"><input type="text" inputMode="decimal" value={form.fahrerStunden} onChange={e=>setForm({...form,fahrerStunden:e.target.value})}/></Field></section><section className="section"><Field label="Bemerkung"><textarea value={form.bemerkung} onChange={e=>setForm({...form,bemerkung:e.target.value})}/></Field></section><button className="primary" type="submit" disabled={!canSave}>{sending?"Speichert...":"Eintrag speichern"}</button></form><footer>© by Steininger Flo</footer></main></div>}
+return <div className="page"><main className="app-card"><header className="top"><div className="logo">m³</div><div className="header-text"><h1>{APP_NAME}</h1><p>m³-Erfassung für Anlage1 und Anlage2</p></div><button type="button" className="settings-button" onClick={()=>setShowSettings(!showSettings)}>⚙️</button></header>{showSettings&&<section className="section settings-panel"><h2>Einstellungen</h2><div className="settings-grid"><div><h3>Fahrer</h3><div className="add-row"><input value={newDriver} onChange={e=>setNewDriver(e.target.value)}/><button type="button" className="secondary" onClick={()=>addListItem("driver")} disabled={loading}>Hinzufügen</button></div><div className="list-box">{drivers.map(name=><div className="list-item" key={name}><span>{name}</span><button type="button" onClick={()=>deleteListItem("driver",name)}>Löschen</button></div>)}</div></div><div><h3>Kunden</h3><div className="add-row"><input value={newCustomer} onChange={e=>setNewCustomer(e.target.value)}/><button type="button" className="secondary" onClick={()=>addListItem("customer")} disabled={loading}>Hinzufügen</button></div><div className="list-box">{customers.map(name=><div className="list-item" key={name}><span>{name}</span><button type="button" onClick={()=>deleteListItem("customer",name)}>Löschen</button></div>)}</div></div></div></section>}{message&&<div className="message">{message}</div>}<form className="form" onSubmit={saveEntry}><section className="section"><h2>Einsatz</h2><Field label="Datum"><input type="date" value={form.datum} onChange={e=>setForm({...form,datum:e.target.value})}/></Field><Field label="Anlage"><select value={form.anlage} onChange={e=>setForm({...form,anlage:e.target.value})}>{ANLAGEN.map(anlage=><option key={anlage} value={anlage}>{anlage}</option>)}</select></Field></section><section className="section person-section">
+        <h2>Kunde</h2>
+        <SearchSelect label="Kunde auswählen oder eintippen" value={form.kunde} options={customers} onChange={value=>setForm({...form,kunde:value})}/>
+      </section>
+
+      <section className="section person-section">
+        <h2>Fahrer</h2>
+        <SearchSelect label="Fahrer auswählen oder eintippen" value={form.fahrer} options={drivers} onChange={value=>setForm({...form,fahrer:value})}/>
+      </section><section className="section"><h2>Menge</h2><Field label="Gepumpte Menge in m³"><input type="text" inputMode="decimal" value={form.kubikmeter} onChange={e=>setForm({...form,kubikmeter:e.target.value})}/></Field><div className={!hasValidM3&&form.kubikmeter?"result error":"result"}><span>Menge</span><strong>{hasValidM3?formatNumber(m3)+" m³":"—"}</strong></div></section><section className="section"><h2>Fahrerzeit</h2><div className="stopwatch"><strong>{secondsToClock(stopwatchSeconds)}</strong><div className="stopwatch-buttons"><button type="button" className="secondary" onClick={()=>setStopwatchRunning(true)} disabled={stopwatchRunning}>Start</button><button type="button" className="small-button" onClick={()=>setStopwatchRunning(false)} disabled={!stopwatchRunning}>Pause</button><button type="button" className="small-button" onClick={resetStopwatch}>Reset</button></div><button type="button" className="small-button" onClick={useStopwatchAsWorkTime}>Zeit übernehmen</button></div><Field label="Gefahrene / gearbeitete Stunden Fahrer"><input type="text" inputMode="decimal" value={form.fahrerStunden} onChange={e=>setForm({...form,fahrerStunden:e.target.value})}/></Field></section><section className="section"><Field label="Bemerkung"><textarea value={form.bemerkung} onChange={e=>setForm({...form,bemerkung:e.target.value})}/></Field></section><button className="primary" type="submit" disabled={!canSave}>{sending?"Speichert...":"Eintrag speichern"}</button></form><footer>© by Steininger Flo</footer></main></div>}

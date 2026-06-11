@@ -1,4 +1,4 @@
-# Gülleverschlauchung App v2
+# Gülleverschlauchung App v3
 
 Funktionen:
 - Anlagen: Anlage1 und Anlage2
@@ -26,3 +26,10 @@ Einrichtung:
 - Dropdowns öffnen erst nach Eingabe.
 - Fahrer/Kunde überlagern sich nicht mehr.
 - Kommentartexte in Eingabefeldern entfernt.
+
+
+Änderungen v3:
+- Kunde und Fahrer sind in getrennten Bereichen.
+- Suchvorschläge öffnen unterhalb des jeweiligen Feldes und verschieben den Inhalt nach unten.
+- Keine Überlappung mit dem nächsten Feld.
+- Dropdown öffnet erst nach Eingabe.
